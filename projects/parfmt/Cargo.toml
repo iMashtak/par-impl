@@ -1,0 +1,6 @@
+[package]
+name = "parfmt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

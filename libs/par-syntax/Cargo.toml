@@ -1,0 +1,15 @@
+[package]
+name = "par-syntax"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+arcstr = { version = "*" }
+lalrpop-util = { version = "0.22.2", features = ["lexer", "unicode"] }
+logos = { version = "*" }
+
+[dev-dependencies]
+miette = { version = "*", features = ["fancy"] }
+
+[build-dependencies]
+lalrpop = { version = "0.22.2" }

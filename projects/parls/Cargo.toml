@@ -1,0 +1,6 @@
+[package]
+name = "parls"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

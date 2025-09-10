@@ -1,0 +1,6 @@
+[package]
+name = "par-exec"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
