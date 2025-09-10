@@ -40,7 +40,6 @@ extern {
         "or" => Token::Or,
         "not" => Token::Not,
 
-        "_" => Token::Placeholder,
         "!" => Token::Unit,
         "?" => Token::Question,
         ":" => Token::Colon,

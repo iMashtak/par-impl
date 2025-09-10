@@ -4,3 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+par-syntax.workspace = true
+
+clap = { version = "*", features = ["derive"] }
+miette = { version = "*", features = ["fancy", "syntect-highlighter"] }
+tokio = { version = "*", features = ["full"] }

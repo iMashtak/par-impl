@@ -7,7 +7,5 @@ edition.workspace = true
 par-syntax.workspace = true
 
 clap = { version = "*", features = ["derive"] }
-lalrpop-util = { version = "0.22.2", features = ["lexer", "unicode"] }
 miette = { version = "*", features = ["fancy", "syntect-highlighter"] }
-thiserror = { version = "*" }
 tokio = { version = "*", features = ["full"] }

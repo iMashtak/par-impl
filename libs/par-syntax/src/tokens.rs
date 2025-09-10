@@ -65,8 +65,6 @@ pub enum Token {
     #[token("not")]
     Not,
 
-    #[token("_")]
-    Placeholder,
     #[token("!")]
     Unit,
     #[token("?")]
@@ -139,7 +137,7 @@ pub enum Token {
 
     #[regex(r"[A-Z][A-Za-z0-9_]*", |lex| ArcStr::from(lex.slice()))]
     GlobalIdent(ArcStr),
-    #[regex(r"[a-z][A-Za-z0-9_]*", |lex| ArcStr::from(lex.slice()))]
+    #[regex(r"[a-z_][A-Za-z0-9_]*", |lex| ArcStr::from(lex.slice()))]
     LocalIdent(ArcStr),
 
     #[regex(r#"//[^\n\r]*(\n|\r|\r\n)"#, |lex| ArcStr::from(lex.slice()))]
