@@ -64,7 +64,7 @@ All made changes may be concern as my personal vision of good programming langua
     ```rust
     strings[str]
     ```
-    while it is understandable that this syntax inspired by pi-calculus, array/map indexing is far more adopted concept in programming languages;
+    while it is understandable that this syntax is inspired by pi-calculus, array/map indexing is far more adopted concept in programming languages;
 - to make grammar correct and able to support operator-expressions, in process syntax each command must be semicolon-separated:
     ```rust
     def LetsBuildStrings = do {
@@ -96,8 +96,8 @@ All made changes may be concern as my personal vision of good programming langua
         console.close;
     } in !
     ```
-- to remove parsing ambiguity with `!` symbol, logical operators are names as words `and`, `or` and `not`;
-- to make grammar correct and remove ambiguity with complex operator expressions, pair construction needs with `.` symbol:
+- to remove parsing ambiguity with `!` symbol, logical operators are named as words `and`, `or` and `not`;
+- to make grammar correct and remove ambiguity with complex operator expressions, pair construction needs `.` symbol:
     ```rust
     def Main: ! = do {
         let pair = .(x) y;
