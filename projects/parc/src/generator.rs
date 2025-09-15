@@ -73,11 +73,10 @@ fn gen_definition(definition: &Definition) -> anyhow::Result<TokenStream> {
                         chan((), async move |s, r, ()| {
                             let x = r.recv().await.unwrap();
                             println!("{:?}", x);
-                            s.send(Value::Unit).await.unwrap();
                         })
                     }
                 }
-            }
+            },
             _ => unreachable!(),
         },
         Definition::ProcessExpr { name, expr, .. } => {
@@ -155,10 +154,21 @@ fn gen_step(
         }
         ProcessStep::Link { target, expr, .. } => {
             let (target_s, _) = make_sender_receiver(target)?;
-            let expr = gen_expr(expr)?;
-            quote! {
-                let (__s, __r) = #expr;
-                link(#target_s, __r);
+            match expr {
+                ProcessExpr::Ident { value: Ident::Local(x), .. } => {
+                    let (_, x_r) = make_sender_receiver(x)?;
+                    defer.shift_remove(&x_r.to_string());
+                    quote! {
+                        link(#target_s, #x_r);
+                    }
+                },
+                _ => {
+                    let expr = gen_expr(expr)?;
+                    quote! {
+                        let (__s, __r) = #expr;
+                        link(#target_s, __r);
+                    }
+                }
             }
         }
         ProcessStep::Begin {
@@ -205,7 +215,7 @@ fn gen_step(
             let (_, target_r) = make_sender_receiver(target)?;
             let (name_s, name_r) = make_sender_receiver(name)?;
             defer.insert(
-                name_s.to_string(),
+                name_r.to_string(),
                 quote! {
                     drop(#name_s);
                     drain(#name_r).await;
