@@ -107,6 +107,29 @@ pub async fn begin<Closure>(
     current
 }
 
+pub fn begin2<Closure: Send + 'static, Fut: Future<Output = Receiver> + Send>(
+    r: Receiver,
+    mut c: Closure,
+    f: impl Fn(LoopSender<Option<Closure>>, Receiver, Closure) -> Fut + Send + 'static,
+) -> Receiver {
+    let (begin_s, begin_r) = raw_chan();
+    tokio::spawn(async move {
+        let mut current = r;
+        loop {
+            let (loop_s, loop_r) = loop_chan();
+            current = f(loop_s, current, c).await;
+            let next = loop_r.await.unwrap();
+            if let Some(next) = next {
+                c = next;
+            } else {
+                break;
+            }
+        }
+        link(begin_s, current);
+    });
+    begin_r
+}
+
 pub async fn drain(r: Receiver) {
     while let Some(_) = r.stream().next().await {}
 }
