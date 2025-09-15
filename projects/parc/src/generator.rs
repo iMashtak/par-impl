@@ -175,7 +175,7 @@ fn gen_step(
                     #(#steps_tokens)*
                     #(#defer_tokens)*
                     #target_r
-                }).await;
+                });
             }
         }
         ProcessStep::Case { target, alts, .. } => {

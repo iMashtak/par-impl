@@ -1,4 +1,4 @@
-use crate::operations::{begin, begin2, case, chan, drain, link, raw_chan, Value};
+use crate::operations::{begin, case, chan, drain, link, raw_chan, Value};
 
 #[tokio::test]
 async fn test_list_builder() {
@@ -61,8 +61,7 @@ async fn test_list_builder() {
                 .await;
                 input_r
             },
-        )
-        .await;
+        );
         drain(func_r).await;
     });
 
@@ -87,7 +86,7 @@ async fn test_list_builder() {
     list_builder_s.send(Value::label("build")).await.unwrap();
 
     println!("before print begin");
-    let list_builder_r = begin2(
+    let list_builder_r = begin(
         list_builder_r,
         (print_boxed,),
         async move |loop_s, input_r, (print_boxed,)| {

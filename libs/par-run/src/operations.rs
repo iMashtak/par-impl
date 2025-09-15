@@ -88,26 +88,7 @@ pub async fn case<Closure, Fut: Future<Output = Receiver> + Send>(
     r
 }
 
-pub async fn begin<Closure>(
-    r: Receiver,
-    mut c: Closure,
-    f: impl AsyncFn(LoopSender<Option<Closure>>, Receiver, Closure) -> Receiver,
-) -> Receiver {
-    let mut current = r;
-    loop {
-        let (loop_s, loop_r) = loop_chan();
-        current = f(loop_s, current, c).await;
-        let next = loop_r.await.unwrap();
-        if let Some(next) = next {
-            c = next;
-        } else {
-            break;
-        }
-    }
-    current
-}
-
-pub fn begin2<Closure: Send + 'static, Fut: Future<Output = Receiver> + Send>(
+pub fn begin<Closure: Send + 'static, Fut: Future<Output = Receiver> + Send>(
     r: Receiver,
     mut c: Closure,
     f: impl Fn(LoopSender<Option<Closure>>, Receiver, Closure) -> Fut + Send + 'static,
