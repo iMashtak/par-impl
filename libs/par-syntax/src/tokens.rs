@@ -64,6 +64,8 @@ pub enum Token {
     Or,
     #[token("not")]
     Not,
+    #[token("break")]
+    Break,
 
     #[token("!")]
     Unit,

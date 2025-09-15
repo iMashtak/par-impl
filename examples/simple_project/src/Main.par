@@ -1,0 +1,26 @@
+def Main = chan result {
+  let list = chan result {
+    result.item
+    result("1")
+    result.item
+    result(2)
+    result.end
+    result <> !
+  }
+  list.begin {
+    list.case {
+      .item => {
+        list[x]
+        let println = Println
+        println(x)
+        loop
+      },
+      .end => {
+        break
+      },
+    }
+  }
+  result <> !
+}
+
+native def Println

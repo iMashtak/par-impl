@@ -1,0 +1,6 @@
+[package]
+group = "org"
+name = "Example"
+version = "1.0.0"
+
+[dependencies]

@@ -39,6 +39,7 @@ extern {
         "and" => Token::And,
         "or" => Token::Or,
         "not" => Token::Not,
+        "break" => Token::Break,
 
         "!" => Token::Unit,
         "?" => Token::Question,
@@ -92,220 +93,39 @@ pub Program: Program
     => Program {defs, l, r};
 
 Definition: Definition = {
-    <l: @L> "native" "def" <name: GlobalIdent> ":" <typing: TypeExpr> <r: @R> => Definition::Native {name, typing, l, r},
-    <l: @L> "def" <name: GlobalIdent> <typing: TypeAnnotation?> "=" <value: ValueExpr> <r: @R> => Definition::Value {name, typing, value, l, r},
-    <l: @L> "type" <name: GlobalIdent> "=" <expr: TypeExpr> <r: @R> => Definition::Type {name, expr, l, r},
+    <l: @L> "native" "def" <name: GlobalIdent> <r: @R> => Definition::Native {name, l, r},
+    <l: @L> "def" <name: GlobalIdent> "=" <expr: ProcessExpr> <r: @R> => Definition::ProcessExpr {name, expr, l, r},
 };
-
-TypeAnnotation: TypeExpr
-    = ":" <typing: TypeExpr>
-    => typing;
 
 // ---
-// Types
-// ---
-
-TypeExpr: TypeExpr = {
-    <l: @L> "!" <r: @R> => TypeExpr::Unit {l, r},
-    <l: @L> "self" <label: Label?> <r: @R> => TypeExpr::Self_ {label, l, r},
-    <l: @L> <ident: Ident> <inner: TypeExpr?> <r: @R> => TypeExpr::Ident {ident, inner: inner.map(|x| Box::new(x)), l, r},
-    <l: @L> "box" <inner: TypeExpr> <r: @R> => TypeExpr::Box {inner: Box::new(inner), l, r},
-    <l: @L> "dual" <inner: TypeExpr> <r: @R> => TypeExpr::Dual {inner: Box::new(inner), l, r},
-    <l: @L> "(" <inners: Comma<TypeExpr>> ")" <outer: TypeExpr> <r: @R> => TypeExpr::Tuple {inners, outer: Box::new(outer), l, r},
-    <l: @L> "[" <inners: Comma<TypeExpr>> "]" <outer: TypeExpr> <r: @R> => TypeExpr::Function {inners, outer: Box::new(outer), l, r},
-    <l: @L> "{" <inners: Comma<TypeExpr>> "}" <outer: TypeExpr?> <r: @R> => TypeExpr::Exist {inners, outer: outer.map(|x| Box::new(x)), l, r},
-    <l: @L> "<" <inners: Comma<TypeExpr>> ">" <outer: TypeExpr?> <r: @R> => TypeExpr::ForAll {inners, outer: outer.map(|x| Box::new(x)), l, r},
-    <l: @L> "iterative" <label: Label?> <inner: TypeExpr> <r: @R> => TypeExpr::Iterative {label, inner: Box::new(inner), l, r},
-    <l: @L> "recursive" <label: Label?> <inner: TypeExpr> <r: @R> => TypeExpr::Recursive {label, inner: Box::new(inner), l, r},
-    <l: @L> "either" "{" <branches: Comma<EitherBranchTypeExpr>> "}" <r: @R> => TypeExpr::Either {branches, l, r},
-    <l: @L> "choice" "{" <branches: Comma<ChoiceBranchTypeExpr>> "}" <r: @R> => TypeExpr::Either {branches, l, r},
-    ! => { errors.push(<>); TypeExpr::Error },
-};
-EitherBranchTypeExpr: EitherBranchTypeExpr
-    = <l: @L> "." <name: LocalIdent> ":" <inner: TypeExpr> <r: @R>
-    => EitherBranchTypeExpr {name, inner: Box::new(inner), l, r};
-ChoiceBranchTypeExpr: EitherBranchTypeExpr
-    = <l: @L> "." <name: LocalIdent> ":" <inner: TypeExpr> <r: @R>
-    => EitherBranchTypeExpr {name, inner: Box::new(inner), l, r};
-
-// ---
-// Values
-// ---
-
-ValueExpr = ValueExprLevel9;
-ValueExprLevel9: ValueExpr = {
-    <l: @L> "let" <name: LocalIdent> <typing: TypeAnnotation?> "=" <inner: ValueExpr> "in" <outer: ValueExpr> <r: @R> => ValueExpr::Let {name, typing, inner: Box::new(inner), outer: Box::new(outer), l, r},
-    <l: @L> "box" <expr: ValueExpr> <r: @R> => ValueExpr::Box {expr: Box::new(expr), l, r},
-    <l: @L> "begin" <label: Label?> <expr: ValueExpr> <r: @R> => ValueExpr::Begin {expr: Box::new(expr), label, l, r},
-    <l: @L> "do" "{" <process: ProcessStep*> "}" "in" <expr: ValueExpr> <r: @R> => ValueExpr::Do {process, expr: Box::new(expr), l, r},
-    <l: @L> "chan" <name: LocalIdent> "{" <process: ProcessStep+> "}" <r: @R> => ValueExpr::Chan {name, process, l, r},
-    <l: @L> "case" "{" <branches: Comma<CaseBranchValueExpr>> "}" <r: @R> => ValueExpr::Case {branches, l, r},
-    <l: @L> "." "(" <inners: Comma<ValueExpr>> ")" <outer: ValueExpr> <r: @R> => ValueExpr::LambdaTuple {inners, outer: Box::new(outer), l, r},
-    <l: @L> "[" <inners: Comma<LocalIdent>> "]" <outer: ValueExpr> <r: @R> => ValueExpr::LambdaFunction {inners, outer: Box::new(outer), l, r},
-    <l: @L> "{" <inners: Comma<TypeExpr>> "}" <outer: ValueExpr> <r: @R> => ValueExpr::LambdaExist {inners, outer: Box::new(outer), l, r},
-    <l: @L> "<" <inners: Comma<LocalIdent>> ">" <outer: ValueExpr> <r: @R> => ValueExpr::LambdaForAll {inners, outer: Box::new(outer), l, r},
-    ValueExprLevel8,
-};
-ValueExprLevel8: ValueExpr = {
-    <l: @L> <expr: ValueExprLevel1> "<-" <applied: ValueExprLevel7> <r: @R> => ValueExpr::Application {expr: Box::new(expr), applied: Box::new(applied), l, r},
-    ValueExprLevel7
-};
-ValueExprLevel7: ValueExpr = {
-    <l: @L> <left: ValueExprLevel7> "or" <right: ValueExprLevel6> <r: @R> => ValueExpr::Or {left: Box::new(left), right: Box::new(right), l, r},
-    ValueExprLevel6,
-};
-ValueExprLevel6: ValueExpr = {
-    <l: @L> <left: ValueExprLevel6> "and" <right: ValueExprLevel5> <r: @R> => ValueExpr::And {left: Box::new(left), right: Box::new(right), l, r},
-    ValueExprLevel5,
-};
-ValueExprLevel5: ValueExpr = {
-    <l: @L> <left: ValueExprLevel5> "==" <right: ValueExprLevel4> <r: @R> => ValueExpr::Eq {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel5> "!=" <right: ValueExprLevel4> <r: @R> => ValueExpr::NotEq {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel5> "<" <right: ValueExprLevel4> <r: @R> => ValueExpr::Lt {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel5> ">" <right: ValueExprLevel4> <r: @R> => ValueExpr::Gt {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel5> "<=" <right: ValueExprLevel4> <r: @R> => ValueExpr::Le {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel5> ">=" <right: ValueExprLevel4> <r: @R> => ValueExpr::Ge {left: Box::new(left), right: Box::new(right), l, r},
-    ValueExprLevel4,
-};
-ValueExprLevel4: ValueExpr = {
-    <l: @L> <left: ValueExprLevel4> "+" <right: ValueExprLevel3> <r: @R> => ValueExpr::Plus {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel4> "-" <right: ValueExprLevel3> <r: @R> => ValueExpr::BinaryMinus {left: Box::new(left), right: Box::new(right), l, r},
-    ValueExprLevel3,
-};
-ValueExprLevel3: ValueExpr = {
-    <l: @L> <left: ValueExprLevel3> "*" <right: ValueExprLevel2> <r: @R> => ValueExpr::Mul {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel3> "/" <right: ValueExprLevel2> <r: @R> => ValueExpr::Div {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ValueExprLevel3> "%" <right: ValueExprLevel2> <r: @R> => ValueExpr::Mod {left: Box::new(left), right: Box::new(right), l, r},
-    ValueExprLevel2,
-};
-ValueExprLevel2: ValueExpr = {
-    <l: @L> "-" <expr: ValueExprLevel2> <r: @R> => ValueExpr::UnaryMinus {expr: Box::new(expr), l, r},
-    <l: @L> "not" <expr: ValueExprLevel2> <r: @R> => ValueExpr::Not {expr: Box::new(expr), l, r},
-    ValueExprLevel1,
-};
-ValueExprLevel1: ValueExpr = {
-    <l: @L> <expr: ValueExprLevel1> "." "begin" <label: Label?> <r: @R> => ValueExpr::ConsumingBegin {expr: Box::new(expr), label, l, r},
-    <l: @L> <expr: ValueExprLevel1> "." "loop" <label: Label?> <r: @R> => ValueExpr::ConsumingLoop {expr: Box::new(expr), label, l, r},
-    <l: @L> <expr: ValueExprLevel1> "." "case" "{" <branches: Comma<ConsumingCaseBranchValueExpr>> "}" <r: @R> => ValueExpr::ConsumingCase {expr: Box::new(expr), branches, l, r},
-    <l: @L> <expr: ValueExprLevel1?> "." <name: LocalIdent> <r: @R> => ValueExpr::Signal {expr: expr.map(|x| Box::new(x)), name, l, r},
-    <l: @L> <expr: ValueExprLevel1> "(" <args: Comma<ValueExpr>> ")" <r: @R> => ValueExpr::ApplicationTuple {expr: Box::new(expr), args, l, r},
-    <l: @L> <expr: ValueExprLevel1> "::" "<" <args: Comma<TypeExpr>> ">" <r: @R> => ValueExpr::ApplicationForAll {expr: Box::new(expr), args, l, r},
-    <l: @L> <expr: ValueExprLevel1> "::" "{" <args: Comma<LocalIdent>> "}" <r: @R> => ValueExpr::ApplicationExist {expr: Box::new(expr), args, l, r},
-    ValueExprLevel0,
-};
-ValueExprLevel0: ValueExpr = {
-    <l: @L> <x: "str"> <r: @R> => ValueExpr::Str {value: x, l, r},
-    <l: @L> <x: "i32"> <r: @R> => ValueExpr::I32 {value: x, l, r},
-    <l: @L> <x: "u64"> <r: @R> => ValueExpr::U64 {value: x, l, r},
-    <l: @L> <x: Ident> <r: @R> => ValueExpr::Ident {value: x, l, r},
-    <l: @L> "loop" <label: Label?> <r: @R> => ValueExpr::Loop {label, l, r},
-    <l: @L> "!" <r: @R> => ValueExpr::Break {l, r},
-    "(" <x: ValueExpr> ")" => x,
-    ! => { errors.push(<>); ValueExpr::Error },
-};
-
-CaseBranchValueExpr: CaseBranchValueExpr
-    = <l: @L> "." <name: LocalIdent> "=>" <inner: ValueExpr> <r: @R>
-    => CaseBranchValueExpr {name, inner: Box::new(inner), l, r};
-ConsumingCaseBranchValueExpr: ConsumingCaseBranchValueExpr
-    = <l: @L> "." <name: LocalIdent> ":" <pattern: PatternExpr> "=>" <inner: ValueExpr> <r: @R>
-    => ConsumingCaseBranchValueExpr {name, pattern, inner: Box::new(inner), l, r};
-
-// ---
-// Process
+// Process Syntax
 // ---
 
 ProcessStep: ProcessStep = {
-    <l: @L> "let" <pattern: PatternExpr> "=" <expr: ProcessExpr> ";" <r: @R> => ProcessStep::Let {pattern, expr, l, r},
-    <l: @L> "recv" <name: LocalIdent> "=" <expr: ProcessExpr> ";" <r: @R> => ProcessStep::Recv {name, expr, l, r},
-    <l: @L> <expr: ProcessExpr> ";" <r: @R> => ProcessStep::Expr {expr, l, r},
+    <l: @L> "let" <name: LocalIdent> "=" <expr: ProcessExpr> <r: @R> => ProcessStep::Let {name, expr, l, r},
+    <l: @L> <target: LocalIdent> "<>" <expr: ProcessExpr> <r: @R> => ProcessStep::Link {target, expr, l, r},
+    <l: @L> <target: LocalIdent> "." "begin" <label: Label?> "{" <steps: ProcessStep*> "}" <r: @R>
+        => ProcessStep::Begin {target, label, steps, l, r},
+    <l: @L> <target: LocalIdent> "." "case" "{" <alts: Comma<CaseBranch>> "}" <r: @R> => ProcessStep::Case {target, alts, l, r},
+    <l: @L> <target: LocalIdent> "[" <name: LocalIdent> "]" <r: @R> => ProcessStep::Recv {target, name, l, r},
+    <l: @L> <target: LocalIdent> "(" <expr: ProcessExpr> ")" <r: @R> => ProcessStep::Send {target, expr, l, r},
+    <l: @L> <target: LocalIdent> "." <signal: LocalIdent> <r: @R> => ProcessStep::Signal {target, signal, l, r},
+    <l: @L> "loop" <label: Label?> <r: @R> => ProcessStep::Loop {label, l, r},
+    <l: @L> "break" <label: Label?> <r: @R> => ProcessStep::Break {label, l, r},
 };
 
-ProcessExpr = ProcessExprLevel9;
-ProcessExprLevel9: ProcessExpr = {
-    <l: @L> "box" <expr: ProcessExpr> <r: @R> => ProcessExpr::Box {expr: Box::new(expr), l, r},
-    <l: @L> "case" "{" <branches: Comma<CaseBranchProcessExpr>> "}" <r: @R> => ProcessExpr::Case {branches, l, r},
-    <l: @L> "begin" <label: Label?> <expr: ProcessExpr> <r: @R> => ProcessExpr::Begin {expr: Box::new(expr), label, l, r},
-    <l: @L> "[" <inners: Comma<LocalIdent>> "]" <outer: ProcessExpr> <r: @R> => ProcessExpr::LambdaFunction {inners, outer: Box::new(outer), l, r},
-    <l: @L> "{" <inners: Comma<TypeExpr>> "}" <outer: ProcessExpr> <r: @R> => ProcessExpr::LambdaExist {inners, outer: Box::new(outer), l, r},
-    <l: @L> "<" <inners: Comma<LocalIdent>> ">" <outer: ProcessExpr> <r: @R> => ProcessExpr::LambdaForAll {inners, outer: Box::new(outer), l, r},
-    ProcessExprLevel8,
-};
-ProcessExprLevel8: ProcessExpr = {
-    <l: @L> <expr: ProcessExprLevel1> "<-" <applied: ProcessExprLevel7> <r: @R> => ProcessExpr::Application {expr: Box::new(expr), applied: Box::new(applied), l, r},
-    ProcessExprLevel7
-};
-ProcessExprLevel7: ProcessExpr = {
-    <l: @L> <left: ProcessExprLevel7> "or" <right: ProcessExprLevel6> <r: @R> => ProcessExpr::Or {left: Box::new(left), right: Box::new(right), l, r},
-    ProcessExprLevel6,
-};
-ProcessExprLevel6: ProcessExpr = {
-    <l: @L> <left: ProcessExprLevel6> "and" <right: ProcessExprLevel5> <r: @R> => ProcessExpr::And {left: Box::new(left), right: Box::new(right), l, r},
-    ProcessExprLevel5,
-};
-ProcessExprLevel5: ProcessExpr = {
-    <l: @L> <left: ProcessExprLevel5> "==" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::Eq {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel5> "!=" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::NotEq {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel5> "<" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::Lt {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel5> ">" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::Gt {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel5> "<=" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::Le {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel5> ">=" <right: ProcessExprLevel4> <r: @R> => ProcessExpr::Ge {left: Box::new(left), right: Box::new(right), l, r},
-    ProcessExprLevel4,
-};
-ProcessExprLevel4: ProcessExpr = {
-    <l: @L> <left: ProcessExprLevel4> "+" <right: ProcessExprLevel3> <r: @R> => ProcessExpr::Plus {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel4> "-" <right: ProcessExprLevel3> <r: @R> => ProcessExpr::BinaryMinus {left: Box::new(left), right: Box::new(right), l, r},
-    ProcessExprLevel3,
-};
-ProcessExprLevel3: ProcessExpr = {
-    <l: @L> <left: ProcessExprLevel3> "*" <right: ProcessExprLevel2> <r: @R> => ProcessExpr::Mul {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel3> "/" <right: ProcessExprLevel2> <r: @R> => ProcessExpr::Div {left: Box::new(left), right: Box::new(right), l, r},
-    <l: @L> <left: ProcessExprLevel3> "%" <right: ProcessExprLevel2> <r: @R> => ProcessExpr::Mod {left: Box::new(left), right: Box::new(right), l, r},
-    ProcessExprLevel2,
-};
-ProcessExprLevel2: ProcessExpr = {
-    <l: @L> "-" <expr: ProcessExprLevel2> <r: @R> => ProcessExpr::UnaryMinus {expr: Box::new(expr), l, r},
-    <l: @L> "not" <expr: ProcessExprLevel2> <r: @R> => ProcessExpr::Not {expr: Box::new(expr), l, r},
-    ProcessExprLevel1,
-};
-ProcessExprLevel1: ProcessExpr = {
-    <l: @L> <expr: ProcessExprLevel1> "." "begin" <label: Label?> <r: @R> => ProcessExpr::ConsumingBegin {expr: Box::new(expr), label, l, r},
-    <l: @L> <expr: ProcessExprLevel1> "." "loop" <label: Label?> <r: @R> => ProcessExpr::ConsumingLoop {expr: Box::new(expr), label, l, r},
-    <l: @L> <expr: ProcessExprLevel1> "." "case" "{" <branches: Comma<ConsumingCaseBranchProcessExpr>> "}" <r: @R> => ProcessExpr::ConsumingCase {expr: Box::new(expr), branches, l, r},
-    <l: @L> <expr: ProcessExprLevel1?> "." <name: LocalIdent> <r: @R> => ProcessExpr::Signal {expr: expr.map(|x| Box::new(x)), name, l, r},
-    <l: @L> <expr: ProcessExprLevel1> "(" <args: Comma<ProcessExpr>> ")" <r: @R> => ProcessExpr::ApplicationTuple {expr: Box::new(expr), args, l, r},
-    <l: @L> <expr: ProcessExprLevel1> "::" "<" <args: Comma<TypeExpr>> ">" <r: @R> => ProcessExpr::ApplicationForAll {expr: Box::new(expr), args, l, r},
-    <l: @L> <expr: ProcessExprLevel1> "::" "{" <args: Comma<LocalIdent>> "}" <r: @R> => ProcessExpr::ApplicationExist {expr: Box::new(expr), args, l, r},
-    ProcessExprLevel0,
-};
-ProcessExprLevel0: ProcessExpr = {
+ProcessExpr: ProcessExpr = {
+    <l: @L> "chan" <name: LocalIdent> "{" <steps: ProcessStep+> "}" <r: @R> => ProcessExpr::Chan {name, steps, l, r},
     <l: @L> <x: "str"> <r: @R> => ProcessExpr::Str {value: x, l, r},
     <l: @L> <x: "i32"> <r: @R> => ProcessExpr::I32 {value: x, l, r},
     <l: @L> <x: "u64"> <r: @R> => ProcessExpr::U64 {value: x, l, r},
     <l: @L> <x: Ident> <r: @R> => ProcessExpr::Ident {value: x, l, r},
-    <l: @L> "loop" <label: Label?> <r: @R> => ProcessExpr::Loop {label, l, r},
-    <l: @L> "!" <r: @R> => ProcessExpr::Break {l, r},
-    "(" <x: ProcessExpr> ")" => x,
-    ! => { errors.push(<>); ProcessExpr::Error },
+    <l: @L> "!" <r: @R> => ProcessExpr::Unit {l, r},
 };
 
-CaseBranchProcessExpr: CaseBranchProcessExpr
+CaseBranch: CaseBranch
     = <l: @L> "." <name: LocalIdent> "=>" "{" <inner: ProcessStep*> "}" <r: @R>
-    => CaseBranchProcessExpr {name, inner, l, r};
-ConsumingCaseBranchProcessExpr: ConsumingCaseBranchProcessExpr
-    = <l: @L> "." <name: LocalIdent> ":" <pattern: PatternExpr> "=>" "{" <inner: ProcessStep*> "}" <r: @R>
-    => ConsumingCaseBranchProcessExpr {name, pattern, inner, l, r};
-
-// ---
-// Pattern
-// ---
-
-PatternExpr: PatternExpr = {
-    <l: @L> "!" <r: @R> => PatternExpr::Unit {l, r},
-    <l: @L> <name: LocalIdent> <r: @R> => PatternExpr::LocalIdent {name, l, r},
-    <l: @L> "(" <inners: Comma<PatternExpr>> ")" <outer: PatternExpr> <r: @R> => PatternExpr::Tuple {inners, outer: Box::new(outer), l, r},
-    ! => { errors.push(<>); PatternExpr::Error },
-};
+    => CaseBranch {name, inner, l, r};
 
 // ---
 // Primitives

@@ -28,25 +28,26 @@ impl Value {
     }
 }
 
-type LoopSender<T> = oneshot::Sender<T>;
-type LoopReceiver<T> = oneshot::Receiver<T>;
-type Sender = kanal::AsyncSender<Value>;
-type Receiver = kanal::AsyncReceiver<Value>;
+pub type LoopSender<T> = oneshot::Sender<T>;
+pub type LoopReceiver<T> = oneshot::Receiver<T>;
+pub type Sender = kanal::AsyncSender<Value>;
+pub type Receiver = kanal::AsyncReceiver<Value>;
 
-pub fn chan() -> (Sender, Receiver) {
+pub fn raw_chan() -> (Sender, Receiver) {
     kanal::bounded_async(512)
 }
 
-pub fn oneshot<T>() -> (LoopSender<T>, LoopReceiver<T>) {
+fn loop_chan<T>() -> (LoopSender<T>, LoopReceiver<T>) {
     oneshot::channel()
 }
 
-pub fn value(value: Value) -> Receiver {
-    let (s, r) = chan();
+pub fn value(value: Value) -> (Sender, Receiver) {
+    let (s, r) = raw_chan();
+    let c = s.clone();
     tokio::spawn(async move {
-        s.send(value).await.unwrap();
+        c.send(value).await.unwrap();
     });
-    r
+    (s, r)
 }
 
 pub fn link(s: Sender, r: Receiver) {
@@ -57,12 +58,12 @@ pub fn link(s: Sender, r: Receiver) {
     });
 }
 
-pub fn func_once<Closure: Send + 'static, Fut: Future<Output = ()> + Send>(
+pub fn chan<Closure: Send + 'static, Fut: Future<Output = ()> + Send>(
     c: Closure,
     f: impl FnOnce(Sender, Receiver, Closure) -> Fut + Send + 'static,
 ) -> (Sender, Receiver) {
-    let (func_s, func_r) = chan();
-    let (result_s, result_r) = chan();
+    let (func_s, func_r) = raw_chan();
+    let (result_s, result_r) = raw_chan();
     tokio::spawn(async move {
         f(result_s, func_r, c).await;
     });
@@ -94,7 +95,7 @@ pub async fn begin<Closure>(
 ) -> Receiver {
     let mut current = r;
     loop {
-        let (loop_s, loop_r) = oneshot();
+        let (loop_s, loop_r) = loop_chan();
         current = f(loop_s, current, c).await;
         let next = loop_r.await.unwrap();
         if let Some(next) = next {

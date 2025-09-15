@@ -14,22 +14,6 @@ fn format_program(program: &Program, result: &mut String, indent: u64) {
             result.push('\n');
             first = false;
         }
-        format_definition(definition, result, indent);
-    }
-}
-
-fn format_definition(definition: &Definition, result: &mut String, indent: u64) {
-    match definition {
-        Definition::Native { name, typing, .. } => {
-            result.push_str("native def");
-            
-        },
-        Definition::Value {
-            name,
-            typing,
-            value,
-            ..
-        } => todo!(),
-        Definition::Type { name, expr, .. } => todo!(),
+        // format_definition(definition, result, indent);
     }
 }
