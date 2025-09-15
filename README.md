@@ -4,6 +4,29 @@ Origin: [Par Lang](https://github.com/faiface/par-lang).
 
 This repo contains alternative implementation of Par language.
 
+## Execution
+
+To run an example project:
+
+```bash
+cargo run -p parc -- examples/simple_project
+```
+
+It will transpile Par code from that directory to Rust project in relative `target` directory. Then you should build generated Rust project and run run it:
+
+```bash
+cd examples/simple_project/target
+cargo run
+```
+
+On every transpilation files are removed from `target`, so to rerun generated project without messing with `cd` you my just run:
+
+```bash
+cd . && cargo run
+```
+
+Be careful - there is no typechecking! If your program is not correct, either generated Rust project will not compile or it will stuck forever.
+
 ## Parsing
 
 ### Why?
