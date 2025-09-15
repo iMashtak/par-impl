@@ -19,7 +19,7 @@ cd examples/simple_project/target
 cargo run
 ```
 
-On every transpilation files are removed from `target`, so to rerun generated project without messing with `cd` you my just run:
+On every transpilation files are removed from `target`, so to rerun generated project without messing with `cd` you may just run:
 
 ```bash
 cd . && cargo run
