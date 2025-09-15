@@ -1,0 +1,15 @@
+[package]
+name = "par-run"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { version = "*" }
+arcstr = { version = "*" }
+async-recursion = "1.1.1"
+dashmap = { version = "*" }
+miette = { version = "*" }
+tokio = { version = "*", features = ["full"] }
+
+kanal = { version = "*" }
+futures = { version = "*" }

@@ -1,0 +1,21 @@
+name: Par
+file_extensions: [par]
+scope: source.par
+
+contexts:
+  main:
+    - match: \b(native|def|type|let|recv|either|case|choice|chan|dual|recursive|iterative|box|self|begin|loop|in|try|catch|throw|do|unfounded|and|or|not)\b
+      scope: keyword.control.par
+    - match: \b[A-Z][A-Za-z0-9_]*\b
+      scope: entity.name.class
+    - match: \b[a-z_][A-Za-z0-9_]*\b
+      scope: entity.name.function
+    - match: '"'
+      push: string
+
+  string:
+    - meta_scope: string.quoted.double.par
+    - match: \\.
+      scope: constant.character.escape.par
+    - match: '"'
+      pop: true

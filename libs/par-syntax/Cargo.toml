@@ -7,7 +7,8 @@ edition.workspace = true
 arcstr = { version = "*" }
 lalrpop-util = { version = "0.22.2", features = ["lexer", "unicode"] }
 logos = { version = "*" }
-miette = { version = "*" }
+miette = { version = "*", features = ["syntect-highlighter"] }
+syntect = { version = "*" }
 
 [dev-dependencies]
 miette = { version = "*", features = ["fancy"] }

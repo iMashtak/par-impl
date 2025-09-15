@@ -128,7 +128,7 @@ pub enum Token {
     #[token("'")]
     SingleQuote,
 
-    #[regex(r#""(\\\\|\\"|[^"\\])*""#, |lex| ArcStr::from(apply_string_escapes(lex.slice().to_string())))]
+    #[regex(r#""(\\|\\"|[^"\\])*""#, |lex| ArcStr::from(apply_string_escapes(lex.slice().to_string())))]
     Str(ArcStr),
     #[regex(r"[-]?[0-9]+", |lex| lex.slice().parse().ok())]
     I32(i32),
@@ -153,6 +153,9 @@ impl fmt::Display for Token {
 pub fn apply_string_escapes(input: String) -> ArcStr {
     input[1..input.len() - 1]
         .replace("\\\"", "\"")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
         .replace("\\\\", "\\")
         .into()
 }

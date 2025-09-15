@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{io::Cursor, sync::Arc};
 
 use lalrpop_util::{ErrorRecovery, ParseError};
-use miette::{miette, LabeledSpan, NamedSource};
+use miette::{LabeledSpan, NamedSource, highlighters::SyntectHighlighter, miette};
+use syntect::{highlighting::ThemeSet, parsing::{SyntaxDefinition, SyntaxSetBuilder}};
 
 use crate::{
     ast::Program,
@@ -88,4 +89,14 @@ fn resolve_parse_error(
             return miette!("{:?}", error).with_source_code(source);
         }
     }
+}
+
+pub fn highlighter() -> SyntectHighlighter {
+    let mut syntax_builder = SyntaxSetBuilder::new();
+    syntax_builder.add(
+        SyntaxDefinition::load_from_str(include_str!("../par.sublime-syntax"), true, None).unwrap(),
+    );
+    let theme_raw = include_str!("../par.tmTheme");
+    let theme = ThemeSet::load_from_reader(&mut Cursor::new(theme_raw)).unwrap();
+    SyntectHighlighter::new(syntax_builder.build(), theme, false)
 }

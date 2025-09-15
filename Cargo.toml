@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
-    "libs/par-exec",
+    "libs/par-run",
     "libs/par-syntax",
     "projects/parc",
     "projects/parfmt",
@@ -15,5 +15,5 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-par-exec = { version = "0.1.0", path = "libs/par-exec" }
+par-run = { version = "0.1.0", path = "libs/par-run" }
 par-syntax = { version = "0.1.0", path = "libs/par-syntax" }
