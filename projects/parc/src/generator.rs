@@ -71,7 +71,7 @@ fn gen_definition(definition: &Definition) -> anyhow::Result<TokenStream> {
                 quote! {
                     fn Println() -> (Sender, Receiver) {
                         chan((), async move |s, r, ()| {
-                            let x = r.recv().await.unwrap();
+                            let x = r.recv().await.unwrap().await;
                             println!("{:?}", x);
                         })
                     }
@@ -222,7 +222,7 @@ fn gen_step(
                 },
             );
             quote! {
-                let (#name_s, #name_r) = value(#target_r.recv().await.unwrap());
+                let (#name_s, #name_r) = recv(&#target_r).await;
             }
         }
         ProcessStep::Send { target, expr, .. } => {
@@ -252,7 +252,7 @@ fn gen_step(
             let (target_s, _) = make_sender_receiver(target)?;
             let signal = signal.content.as_str();
             quote! {
-                #target_s.send(Value::label(#signal)).await.unwrap();
+                send(&#target_s, Value::label(#signal)).await;
             }
         }
         ProcessStep::Break { label, l: _, r } => {

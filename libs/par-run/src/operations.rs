@@ -1,5 +1,7 @@
+use std::pin::Pin;
+
 use arcstr::ArcStr;
-use futures::StreamExt as _;
+use futures::{FutureExt, StreamExt as _};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
@@ -30,8 +32,8 @@ impl Value {
 
 pub type LoopSender<T> = oneshot::Sender<T>;
 pub type LoopReceiver<T> = oneshot::Receiver<T>;
-pub type Sender = kanal::AsyncSender<Value>;
-pub type Receiver = kanal::AsyncReceiver<Value>;
+pub type Sender = kanal::AsyncSender<Pin<Box<dyn Future<Output = Value> + Send + 'static>>>;
+pub type Receiver = kanal::AsyncReceiver<Pin<Box<dyn Future<Output = Value> + Send + 'static>>>;
 
 pub fn raw_chan() -> (Sender, Receiver) {
     kanal::bounded_async(512)
@@ -45,9 +47,22 @@ pub fn value(value: Value) -> (Sender, Receiver) {
     let (s, r) = raw_chan();
     let c = s.clone();
     tokio::spawn(async move {
-        c.send(value).await.unwrap();
+        let value = tokio::spawn(async move { value }).map(|x| x.unwrap());
+        c.send(value.boxed()).await.unwrap();
     });
     (s, r)
+}
+
+pub async fn recv(r: &Receiver) -> (Sender, Receiver) {
+    let fut = r.recv().await.unwrap();
+    let (s, r) = raw_chan();
+    s.send(fut).await.unwrap();
+    (s, r)
+}
+
+pub async fn send(s: &Sender, value: Value) {
+    let value = tokio::spawn(async move { value }).map(|x| x.unwrap());
+    s.send(value.boxed()).await.unwrap();
 }
 
 pub fn link(s: Sender, r: Receiver) {
@@ -75,7 +90,7 @@ pub async fn case<Closure, Fut: Future<Output = Receiver> + Send>(
     c: Closure,
     f: impl FnOnce(ArcStr, Receiver, Closure) -> Fut + Send + 'static,
 ) -> Receiver {
-    let label = r.recv().await.unwrap();
+    let label = r.recv().await.unwrap().await;
     match label {
         Value::Label { x: label } => {
             r = f(label, r, c).await;
