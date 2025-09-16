@@ -58,7 +58,7 @@ fn gen_program(program: &Program) -> anyhow::Result<TokenStream> {
         #[tokio::main]
         async fn main() {
             let (Main_s, Main_r) = Main();
-            drain(Main_r).await;
+            Main_r.await.recv().await.unwrap();
         }
     };
     Ok(result)
@@ -70,8 +70,9 @@ fn gen_definition(definition: &Definition) -> anyhow::Result<TokenStream> {
             "Println" => {
                 quote! {
                     fn Println() -> (Sender, Receiver) {
-                        chan((), async move |s, r, ()| {
-                            let x = r.recv().await.unwrap().await;
+                        chan((), async move |_, r, ()| {
+                            let r = r.await;
+                            let x = r.recv().await.unwrap();
                             println!("{:?}", x);
                         })
                     }
@@ -143,13 +144,23 @@ fn gen_step(
             defer.insert(
                 name_r.to_string(),
                 quote! {
-                    drop(#name_s);
                     drain(#name_r).await;
                 },
             );
-            let expr = gen_expr(expr)?;
-            quote! {
-                let (#name_s, #name_r) = #expr;
+            
+            match expr {
+                ProcessExpr::Ident { value: Ident::Local(x), .. } => {
+                    let (x_s, x_r) = make_sender_receiver(x)?;
+                    quote! {
+                        let (#name_s, #name_r) = (#x_s, #x_r);
+                    }
+                },
+                _ => {
+                    let expr = gen_expr(expr)?;
+                    quote! {
+                        let (#name_s, #name_r) = #expr;
+                    }
+                }
             }
         }
         ProcessStep::Link { target, expr, .. } => {
@@ -180,12 +191,15 @@ fn gen_step(
             let (_, target_r) = make_sender_receiver(target)?;
             let (loop_s, _) = make_loop_label(label, target.r)?;
             let (steps_tokens, defer_tokens) = make_steps(steps)?;
+            defer.insert(target_r.to_string(), quote! {
+                drain(#target_r).await;
+            });
             quote! {
                 let #target_r = begin(#target_r, (), async move |#loop_s, #target_r, _| {
                     #(#steps_tokens)*
                     #(#defer_tokens)*
                     #target_r
-                });
+                }).await;
             }
         }
         ProcessStep::Case { target, alts, .. } => {
@@ -198,6 +212,7 @@ fn gen_step(
                     #name => {
                         #(#steps_tokens)*
                         #(#defer_tokens)*
+                        #target_r
                     }
                 });
             }
@@ -206,8 +221,7 @@ fn gen_step(
                     match label.as_str() {
                         #(#alts_tokens),*
                         _ => unreachable!()
-                    };
-                    #target_r
+                    }
                 }).await;
             }
         }
@@ -217,12 +231,12 @@ fn gen_step(
             defer.insert(
                 name_r.to_string(),
                 quote! {
-                    drop(#name_s);
+                    drop(#name_s.await);
                     drain(#name_r).await;
                 },
             );
             quote! {
-                let (#name_s, #name_r) = recv(&#target_r).await;
+                let (#target_r, #name_s, #name_r) = recv(#target_r);
             }
         }
         ProcessStep::Send { target, expr, .. } => {
@@ -234,16 +248,14 @@ fn gen_step(
                 } => {
                     let (_, x_r) = make_sender_receiver(x)?;
                     quote! {
-                        let __x = #x_r.recv().await.unwrap();
-                        #target_s.send(__x).await.unwrap();
+                        let (#target_s, #x_r) = send_one(#target_s, #x_r).await;
                     }
                 }
                 _ => {
                     let expr = gen_expr(expr)?;
                     quote! {
                         let (__s, __r) = #expr;
-                        let __x = __r.recv().await.unwrap();
-                        #target_s.send(__x).await.unwrap();
+                        let (#target_s, __r) = send_one(#target_s, __r).await;
                     }
                 }
             }
@@ -252,7 +264,7 @@ fn gen_step(
             let (target_s, _) = make_sender_receiver(target)?;
             let signal = signal.content.as_str();
             quote! {
-                send(&#target_s, Value::label(#signal)).await;
+                let #target_s = send_value(#target_s, Value::label(#signal)).await;
             }
         }
         ProcessStep::Break { label, l: _, r } => {
